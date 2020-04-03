@@ -1,0 +1,13 @@
+logging:
+  level:
+    root: INFO
+    org.springframework: INFO
+    org.glassfish.jersey: DEBUG
+    net.thumbtack: DEBUG
+
+todoist:
+  uri: https://api.todoist.com/sync/v8/sync
+
+spring:
+  main:
+    banner-mode: off
