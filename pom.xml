@@ -23,8 +23,9 @@
     </properties>
 
     <modules>
-        <module>ptpb-wrapper-service</module>
+        <module>ptpb-wrapper-db</module>
         <module>ptpb-wrapper-client</module>
+        <module>ptpb-wrapper-service</module>
     </modules>
 
     <build>

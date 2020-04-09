@@ -2,26 +2,23 @@ package net.thumbtack.ptpb.wrapper.client.syncdata;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import net.thumbtack.ptpb.wrapper.client.item.ItemDto;
-import net.thumbtack.ptpb.wrapper.client.project.ProjectDto;
+import lombok.experimental.SuperBuilder;
 
-
-import java.util.List;
+import java.util.Map;
 
 @Data
-@Builder
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 public class TodoistResponse {
     @JsonProperty("sync_token")
     private String token;
     @JsonProperty("temp_id_mapping")
-    private TempIdMapping tempIdMapping;
+    private Map<String, Object> tempIdMapping;
+    @JsonProperty("sync_status")
+    private Map<String, Object> syncStatus;
     @JsonProperty("full_sync")
     private boolean isFullSync;
-    List<ItemDto> items;
-    List<ProjectDto> projects;
 }

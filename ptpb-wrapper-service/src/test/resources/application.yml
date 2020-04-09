@@ -1,8 +1,6 @@
 spring:
   main:
     banner-mode: off
-  jpa:
-      show-sql: true
   rabbitmq:
     host: 127.0.0.1
     port: 5672

@@ -18,5 +18,4 @@ public class PtpbWrapperService {
         log.info("Personal time and progress bar wrapper service started.");
         SpringApplication.run(PtpbWrapperService.class, args);
     }
-
 }
