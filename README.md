@@ -23,7 +23,7 @@ $ cd ./ci
 $ docker-compose up
 ```
 
-The components structure is described in the diagram: [components diagram](https://docs.google.com/drawings/d/1JHPsG3Z8cL-KdWP3kaqRyCCQeZLN8T1-wlnb3tJdT5o/edit?usp=sharing)
+The components structure is described in the diagram: [components diagram](https://drive.google.com/open?id=169lhYAYDKwFrUVnXa4-tXA2rhunOm5UBt2B0HPzh4vs)
 
 
 # Building from sources
