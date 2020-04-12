@@ -1,4 +1,4 @@
-package net.thumbtack.ptpb.wrapper.service.synchronization.mappers;
+package net.thumbtack.ptpb.wrapper.service.synchronization.structmappers;
 
 import net.thumbtack.ptpb.wrapper.client.user.UserDto;
 import net.thumbtack.ptpb.wrapper.db.user.User;
@@ -6,7 +6,7 @@ import net.thumbtack.ptpb.wrapper.db.user.User;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-public class UserMapper {
+public class UserStructMapper {
 
     static public User toUser(UserDto dto) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");

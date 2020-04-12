@@ -1,4 +1,4 @@
-package net.thumbtack.ptpb.wrapper.service.synchronization.mappers;
+package net.thumbtack.ptpb.wrapper.service.synchronization.structmappers;
 
 import net.thumbtack.ptpb.wrapper.client.project.ProjectDto;
 import net.thumbtack.ptpb.wrapper.db.project.Project;
@@ -6,7 +6,7 @@ import net.thumbtack.ptpb.wrapper.db.project.Project;
 import java.util.LinkedList;
 import java.util.List;
 
-public class ProjectMapper {
+public class ProjectStructMapper {
 
     public static Project toProject(ProjectDto dto, long userId) {
         return Project.builder()

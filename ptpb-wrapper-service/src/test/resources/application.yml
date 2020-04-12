@@ -14,3 +14,11 @@ db:
   namespace: ptpb-wrapper
   port: 3000
   host: localhost
+
+
+logging:
+  level:
+    root: INFO
+    org.springframework.amqp: DEBUG
+    org.glassfish.jersey: DEBUG
+    net.thumbtack: DEBUG

@@ -1,5 +1,6 @@
 package net.thumbtack.ptpb.wrapper.db.sync;
 
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -9,6 +10,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class SyncDaoImpl implements SyncDao {
 
+    @NonNull
     private final SyncMapper syncMapper;
 
     @Override

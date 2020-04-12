@@ -1,5 +1,9 @@
 package net.thumbtack.ptpb.wrapper.db.user;
 
+import java.util.Optional;
+
 public interface UserDao {
-    void insertUser(User toUser);
+    Optional<User> getUserById(long id);
+
+    void insertUser(User user);
 }

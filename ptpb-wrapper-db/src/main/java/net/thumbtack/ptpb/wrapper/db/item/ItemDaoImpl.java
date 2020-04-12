@@ -1,5 +1,6 @@
 package net.thumbtack.ptpb.wrapper.db.item;
 
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -11,6 +12,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ItemDaoImpl implements ItemDao {
 
+    @NonNull
     private final ItemMapper itemMapper;
 
     @Override

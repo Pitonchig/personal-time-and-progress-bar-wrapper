@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SyncUserRequest {
-    private String token;
+public class DeleteItemAmqpRequest {
+    private long userId;
+    private long itemId;
 }

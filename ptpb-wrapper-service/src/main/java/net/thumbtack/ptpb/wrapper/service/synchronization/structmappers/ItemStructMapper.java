@@ -1,4 +1,4 @@
-package net.thumbtack.ptpb.wrapper.service.synchronization.mappers;
+package net.thumbtack.ptpb.wrapper.service.synchronization.structmappers;
 
 import net.thumbtack.ptpb.wrapper.client.item.ItemDto;
 import net.thumbtack.ptpb.wrapper.db.item.Item;
@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.LinkedList;
 import java.util.List;
 
-public class ItemMapper {
+public class ItemStructMapper {
 
     static public Item toItem(ItemDto dto) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");

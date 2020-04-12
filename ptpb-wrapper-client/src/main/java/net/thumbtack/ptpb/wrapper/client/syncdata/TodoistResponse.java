@@ -18,7 +18,7 @@ public class TodoistResponse {
     @JsonProperty("temp_id_mapping")
     private Map<String, Object> tempIdMapping;
     @JsonProperty("sync_status")
-    private Map<String, Object> syncStatus;
+    private Map<String, String> syncStatus;
     @JsonProperty("full_sync")
     private boolean isFullSync;
 }

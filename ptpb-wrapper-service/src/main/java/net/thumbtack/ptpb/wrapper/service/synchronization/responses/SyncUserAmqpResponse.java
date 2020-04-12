@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SyncUserResponse {
+public class SyncUserAmqpResponse {
     private long id;
     private String name;
     private String registered;
