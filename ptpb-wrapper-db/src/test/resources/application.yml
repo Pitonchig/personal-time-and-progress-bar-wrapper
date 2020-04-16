@@ -1,8 +1,0 @@
-spring:
-  main:
-    banner-mode: off
-
-db:
-  namespace: ptpb-wrapper
-  port: 3000
-  host: localhost
