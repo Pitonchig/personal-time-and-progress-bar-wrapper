@@ -17,14 +17,12 @@ public class SyncDaoTest {
         syncDao.deleteAllSyncs();
     }
 
-    @Test
-    void testInsertAndGetSync() {
-        Sync sync = Sync.builder()
-                .userId(System.nanoTime())
-                .syncToken(UUID.randomUUID().toString())
-                .build();
-        syncDao.updateSync(sync);
-
-
-    }
+//    @Test
+//    void testInsertAndGetSync() {
+//        Sync sync = Sync.builder()
+//                .userId(System.nanoTime())
+//                .syncToken(UUID.randomUUID().toString())
+//                .build();
+//        syncDao.updateSync(sync);
+//    }
 }

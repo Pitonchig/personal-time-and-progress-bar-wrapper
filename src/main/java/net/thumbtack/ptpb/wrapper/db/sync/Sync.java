@@ -15,6 +15,6 @@ import javax.persistence.Entity;
 @NoArgsConstructor
 public class Sync {
     @Id
-    private long userId;
+    private String userId;
     private String syncToken;
 }

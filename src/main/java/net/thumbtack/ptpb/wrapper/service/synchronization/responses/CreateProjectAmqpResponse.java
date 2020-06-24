@@ -5,10 +5,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class CreateProjectAmqpResponse {
-    private long projectId;
-}
+//@Data
+//@Builder
+//@NoArgsConstructor
+//@AllArgsConstructor
+//public class CreateProjectAmqpResponse {
+//    private long projectId;
+//}

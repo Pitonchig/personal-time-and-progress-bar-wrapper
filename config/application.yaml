@@ -1,5 +1,5 @@
 server:
-  port: 8090
+  port: 8091
 spring:
   main:
     banner-mode: off
@@ -15,6 +15,6 @@ todoist:
   uri: https://api.todoist.com/sync/v8/sync
 
 db:
-  namespace: ptpb-wrapper
+  namespace: ptpb
   port: 3000
   host: localhost

@@ -1,5 +1,6 @@
 package net.thumbtack.ptpb.wrapper.service.synchronization.responses;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,8 +10,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonSerialize
 public class SyncUserAmqpResponse {
-    private long id;
+    private String id;
     private String name;
     private String registered;
 }

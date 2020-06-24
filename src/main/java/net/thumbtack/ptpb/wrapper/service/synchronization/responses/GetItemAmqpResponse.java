@@ -8,16 +8,16 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class GetItemAmqpResponse {
-    private long id;
-    private long projectId;
-    private long userId;
-    private String content;
-    private int priority;
-    private LocalDateTime due;
-    private boolean isCompleted;
-}
+//@Data
+//@Builder
+//@NoArgsConstructor
+//@AllArgsConstructor
+//public class GetItemAmqpResponse {
+//    private long id;
+//    private long projectId;
+//    private long userId;
+//    private String content;
+//    private int priority;
+//    private LocalDateTime due;
+//    private boolean isCompleted;
+//}

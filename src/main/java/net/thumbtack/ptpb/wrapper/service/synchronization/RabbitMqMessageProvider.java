@@ -39,11 +39,11 @@ public class RabbitMqMessageProvider {
         String requestJson = new String(message.getBody());
         ResponseWrapper responseWrapper = handlers.get(type).apply(requestJson);
 
-        if (!responseWrapper.isOk()) {
-            return sendData(false, type, responseWrapper.getData());
-        }
+//        if (!responseWrapper.isOk()) {
+//            return sendData(false, type, responseWrapper.getData());
+//        }
 
-        return sendData(true, type, objectMapper.writeValueAsString(responseWrapper.getData()));
+        return sendData(responseWrapper.isOk(), type, objectMapper.writeValueAsString(responseWrapper));
     }
 
     public void registerHandler(String type, Function<String, ResponseWrapper> handler) {

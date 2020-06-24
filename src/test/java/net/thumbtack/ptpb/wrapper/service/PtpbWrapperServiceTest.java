@@ -22,17 +22,17 @@ public class PtpbWrapperServiceTest {
     private SynchronizationService synchronizationService;
 
 
-    @Test
-    void testSyncUser() throws JsonProcessingException {
-        SyncUserAmqpRequest request = SyncUserAmqpRequest.builder()
-                .token("5f6e430cf393ae5db86773b5e79989fbef6a28d9")
-                .build();
-        ResponseWrapper wrapper = synchronizationService.syncUser(mapper.writeValueAsString(request));
-        assertTrue(wrapper.isOk());
-        SyncUserAmqpResponse response = mapper.readValue(wrapper.getData(), SyncUserAmqpResponse.class);
-        assertNotNull(response);
-        assertTrue(response.getId() > 0);
-        assertNotNull(response.getName());
-    }
+//    @Test
+//    void testSyncUser() throws JsonProcessingException {
+//        SyncUserAmqpRequest request = SyncUserAmqpRequest.builder()
+//                .token("5f6e430cf393ae5db86773b5e79989fbef6a28d9")
+//                .build();
+//        ResponseWrapper wrapper = synchronizationService.syncUser(mapper.writeValueAsString(request));
+//        assertTrue(wrapper.isOk());
+//        SyncUserAmqpResponse response = mapper.readValue(wrapper.getData(), SyncUserAmqpResponse.class);
+//        assertNotNull(response);
+//        assertTrue(response.getId() > 0);
+//        assertNotNull(response.getName());
+//    }
 
 }

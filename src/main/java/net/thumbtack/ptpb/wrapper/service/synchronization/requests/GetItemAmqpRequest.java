@@ -5,11 +5,11 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class GetItemAmqpRequest {
-    private long userId;
-    private long itemId;
-}
+//@Data
+//@Builder
+//@NoArgsConstructor
+//@AllArgsConstructor
+//public class GetItemAmqpRequest {
+//    private long userId;
+//    private long itemId;
+//}
