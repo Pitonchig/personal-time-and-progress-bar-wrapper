@@ -11,7 +11,7 @@ import java.util.Optional;
 public class UserDao {
     private final UserMapper userMapper;
 
-    public Optional<User> getUserById(long id) {
+    public Optional<User> getUserById(String id) {
         return userMapper.findById(id);
     }
 

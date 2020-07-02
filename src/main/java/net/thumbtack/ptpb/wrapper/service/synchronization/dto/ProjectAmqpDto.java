@@ -8,9 +8,9 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProjectDto {
+public class ProjectAmqpDto {
     private String id;
     private String name;
     @Singular
-    List<ItemDto> items;
+    List<ItemAmqpDto> items;
 }

@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class User {
     @Id
-    private long id;
+    private String id;
     private String name;
     private LocalDateTime registered;
     private String token;

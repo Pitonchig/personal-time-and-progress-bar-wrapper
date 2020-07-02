@@ -1,15 +1,5 @@
 package net.thumbtack.ptpb.wrapper.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import net.thumbtack.ptpb.wrapper.SynchronizationService;
-import net.thumbtack.ptpb.wrapper.client.syncdata.TodoistClientService;
-import net.thumbtack.ptpb.wrapper.db.item.ItemDao;
-import net.thumbtack.ptpb.wrapper.db.project.ProjectDao;
-import net.thumbtack.ptpb.wrapper.db.project.ProjectMapper;
-import net.thumbtack.ptpb.wrapper.db.sync.SyncDao;
-import net.thumbtack.ptpb.wrapper.db.user.UserDao;
-import net.thumbtack.ptpb.wrapper.service.synchronization.RabbitMqMessageProvider;
-import net.thumbtack.ptpb.wrapper.service.synchronization.requests.SyncUserAmqpRequest;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;

@@ -3,37 +3,32 @@ package net.thumbtack.ptpb.wrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import net.thumbtack.ptpb.wrapper.client.item.ItemDto;
-import net.thumbtack.ptpb.wrapper.client.project.ProjectDto;
+import lombok.extern.slf4j.Slf4j;
 import net.thumbtack.ptpb.wrapper.client.syncdata.*;
-import net.thumbtack.ptpb.wrapper.client.user.UserDto;
-import net.thumbtack.ptpb.wrapper.db.item.Item;
-import net.thumbtack.ptpb.wrapper.db.item.ItemDao;
-import net.thumbtack.ptpb.wrapper.db.project.Project;
-import net.thumbtack.ptpb.wrapper.db.project.ProjectDao;
 import net.thumbtack.ptpb.wrapper.db.sync.Sync;
 import net.thumbtack.ptpb.wrapper.db.sync.SyncDao;
 import net.thumbtack.ptpb.wrapper.db.todoist.Todoist;
 import net.thumbtack.ptpb.wrapper.db.todoist.TodoistDao;
-import net.thumbtack.ptpb.wrapper.db.user.User;
-import net.thumbtack.ptpb.wrapper.db.user.UserDao;
 import net.thumbtack.ptpb.wrapper.service.synchronization.RabbitMqMessageProvider;
 import net.thumbtack.ptpb.wrapper.service.synchronization.ResponseWrapper;
+import net.thumbtack.ptpb.wrapper.service.synchronization.dto.ItemAmqpDto;
+import net.thumbtack.ptpb.wrapper.service.synchronization.dto.ProjectAmqpDto;
 import net.thumbtack.ptpb.wrapper.service.synchronization.requests.*;
 import net.thumbtack.ptpb.wrapper.service.synchronization.responses.SyncProjectsAmqpResponse;
-import net.thumbtack.ptpb.wrapper.service.synchronization.responses.SyncUserAmqpResponse;
 import net.thumbtack.ptpb.wrapper.service.synchronization.responses.SyncUserTokenAmqpResponse;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static net.thumbtack.ptpb.wrapper.client.syncdata.TodoistResourcesTypes.*;
 
+@Slf4j
 @Component
 public class SynchronizationService {
 
     private final ObjectMapper objectMapper;
-//    private final UserDao userDao;
+    //    private final UserDao userDao;
 //    private final ProjectDao projectDao;
 //    private final ItemDao itemDao;
     private final TodoistDao todoistDao;
@@ -58,16 +53,6 @@ public class SynchronizationService {
 
         provider.registerHandler(SyncUserTokenAmqpRequest.class.getSimpleName(), this::syncUserToken);
         provider.registerHandler(SyncProjectsAmqpRequest.class.getSimpleName(), this::syncProjects);
-
-//        provider.registerHandler(SyncUserAmqpRequest.class.getSimpleName(), this::syncUser);
-//        provider.registerHandler(CreateItemAmqpRequest.class.getSimpleName(), this::createItem);
-//        provider.registerHandler(DeleteItemAmqpRequest.class.getSimpleName(), this::deleteItem);
-//        provider.registerHandler(CreateProjectAmqpRequest.class.getSimpleName(), this::createProject);
-//        provider.registerHandler(DeleteProjectAmqpRequest.class.getSimpleName(), this::deleteProject);
-//        provider.registerHandler(GetItemAmqpRequest.class.getSimpleName(), this::getItem);
-//        provider.registerHandler(GetItemsAmqpRequest.class.getSimpleName(), this::getItems);
-//        provider.registerHandler(GetProjectAmqpRequest.class.getSimpleName(), this::getProject);
-//        provider.registerHandler(GetProjectsAmqpRequest.class.getSimpleName(), this::getProjects);
     }
 
     public ResponseWrapper syncUserToken(String data) {
@@ -83,11 +68,9 @@ public class SynchronizationService {
 
             boolean isTokenValid = response.getUser() != null;
             Optional<Todoist> todoistOptional = todoistDao.getTodoistByUserUuid(request.getUserId());
-            if (todoistOptional.isEmpty()) {
-                return new ResponseWrapper(false, "USER_NOT_FOUND");    //TODO: error code list
-            }
 
-            Todoist todoist = todoistOptional.get();
+            Todoist todoist = todoistOptional.orElseGet(Todoist::new);
+            todoist.setUserId(request.getUserId());
             todoist.setToken((isTokenValid) ? request.getToken() : "");
             todoistDao.insertTodoist(todoist);
 
@@ -97,13 +80,13 @@ public class SynchronizationService {
                     .build();
             syncDao.updateSyncs(Collections.singletonList(sync));
 
-            SyncUserTokenAmqpResponse syncUserAmqpResponse = SyncUserTokenAmqpResponse.builder()
+            SyncUserTokenAmqpResponse syncUserTokenAmqpResponse = SyncUserTokenAmqpResponse.builder()
                     .isValid(isTokenValid)
                     .build();
 
             return ResponseWrapper.builder()
                     .isOk(true)
-                    .data(objectMapper.writeValueAsString(syncUserAmqpResponse))
+                    .data(objectMapper.writeValueAsString(syncUserTokenAmqpResponse))
                     .build();
 
         } catch (JsonProcessingException e) {
@@ -111,36 +94,105 @@ public class SynchronizationService {
         }
     }
 
-
     public ResponseWrapper syncProjects(String data) {
         try {
             SyncProjectsAmqpRequest request = objectMapper.readValue(data, SyncProjectsAmqpRequest.class);
-            String token = "token";
 
-            List<TodoistResourcesTypes> resources = new LinkedList<>();
-            resources.add(PROJECTS);
-            resources.add(ITEMS);
-            SyncResponse response = todoistClientService.getSyncData(token, DEFAULT_TOKEN, resources);
+            Optional<Todoist> todoist = todoistDao.getTodoistByUserUuid(request.getUserId());
+            if (todoist.isEmpty()) {
+                return new ResponseWrapper(false, "TODOIST_TOKEN_NOT_FOUND");   //TODO: error code list
+            }
 
+            String token = todoist.get().getToken();
+            List<TodoistCommand> commands = new LinkedList<>();
 
-            Sync sync = Sync.builder()
-                    .userId(request.getUserId())
-                    .syncToken(response.getToken())
-                    .build();
-            syncDao.updateSyncs(Collections.singletonList(sync));
+            for(ProjectAmqpDto project : request.getProjects()) {
+                commands.addAll(createAddProjectCommands(project));
+            }
+            TodoistResponse todoistResponse = todoistClientService.postData(token, commands);
+
+            List<String> errors = todoistResponse.getSyncStatus().values().stream().filter( p-> !isOkStatus(p)).collect(Collectors.toList());
+            if (!errors.isEmpty()) {
+                return new ResponseWrapper(false, errors.toString());
+            }
 
             SyncProjectsAmqpResponse syncProjectsAmqpResponse = SyncProjectsAmqpResponse.builder()
+                    .userId(request.getUserId())
+                    .fromTodoist(request.isFromTodoist())
+                    .toTodoist(request.isToTodoist())
+                    .projects(request.getProjects())
                     .build();
 
             return ResponseWrapper.builder()
                     .isOk(true)
                     .data(objectMapper.writeValueAsString(syncProjectsAmqpResponse))
                     .build();
-
         } catch (JsonProcessingException e) {
             return new ResponseWrapper(false, e.getMessage());
         }
     }
+
+    private List<TodoistCommand> createAddProjectCommands(ProjectAmqpDto project) {
+        List<TodoistCommand> commands = new LinkedList<>();
+
+        String addProjectCommandUuid = UUID.randomUUID().toString();
+        String tempId = UUID.randomUUID().toString();
+
+        TodoistCommand addProjectCommand = TodoistCommand.builder()
+                .type("project_add")
+                .tempId(tempId)
+                .uuid(addProjectCommandUuid)
+                .arg("name", project.getName())
+                .build();
+        commands.add(addProjectCommand);
+
+        for(ItemAmqpDto item: project.getItems()) {
+            String addItemCommandUuid = UUID.randomUUID().toString();
+
+            TodoistCommand addItemCommand = TodoistCommand.builder()
+                    .type("item_add")
+                    .tempId(UUID.randomUUID().toString())
+                    .uuid(addItemCommandUuid)
+                    .arg("content", item.getContent())
+                    .arg("project_id", tempId)
+                    .build();
+
+            commands.add(addItemCommand);
+        }
+        return commands;
+    }
+
+
+
+//    public ResponseWrapper syncProjects(String data) {
+//        try {
+//            SyncProjectsAmqpRequest request = objectMapper.readValue(data, SyncProjectsAmqpRequest.class);
+//            String token = "token";
+//
+//            List<TodoistResourcesTypes> resources = new LinkedList<>();
+//            resources.add(PROJECTS);
+//            resources.add(ITEMS);
+//            SyncResponse response = todoistClientService.getSyncData(token, DEFAULT_TOKEN, resources);
+//
+//
+//            Sync sync = Sync.builder()
+//                    .userId(request.getUserId())
+//                    .syncToken(response.getToken())
+//                    .build();
+//            syncDao.updateSyncs(Collections.singletonList(sync));
+//
+//            SyncProjectsAmqpResponse syncProjectsAmqpResponse = SyncProjectsAmqpResponse.builder()
+//                    .build();
+//
+//            return ResponseWrapper.builder()
+//                    .isOk(true)
+//                    .data(objectMapper.writeValueAsString(syncProjectsAmqpResponse))
+//                    .build();
+//
+//        } catch (JsonProcessingException e) {
+//            return new ResponseWrapper(false, e.getMessage());
+//        }
+//    }
 
 
 //    public ResponseWrapper syncUser(String data) {
@@ -395,9 +447,9 @@ public class SynchronizationService {
 //                .getSyncToken();
 //    }
 //
-//    private boolean isOkStatus(String status) {
-//        return status.equals("ok");
-//    }
+    private boolean isOkStatus(String status) {
+        return status.equals("ok");
+    }
 
 //    private List<GetItemAmqpResponse> getItemAmqpResponseListByProjectId(long projectId) {
 //        List<Item> items = itemDao.getItemsByProjectId(projectId);

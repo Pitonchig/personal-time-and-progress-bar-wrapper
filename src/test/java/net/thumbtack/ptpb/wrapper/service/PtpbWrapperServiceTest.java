@@ -1,12 +1,7 @@
 package net.thumbtack.ptpb.wrapper.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import net.thumbtack.ptpb.wrapper.service.synchronization.ResponseWrapper;
 import net.thumbtack.ptpb.wrapper.SynchronizationService;
-import net.thumbtack.ptpb.wrapper.service.synchronization.requests.SyncUserAmqpRequest;
-import net.thumbtack.ptpb.wrapper.service.synchronization.responses.SyncUserAmqpResponse;
-import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
