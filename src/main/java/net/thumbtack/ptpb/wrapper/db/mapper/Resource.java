@@ -1,4 +1,4 @@
-package net.thumbtack.ptpb.wrapper.db.user;
+package net.thumbtack.ptpb.wrapper.db.mapper;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,10 +14,8 @@ import java.time.LocalDateTime;
 @Entity
 @AllArgsConstructor
 @NoArgsConstructor
-public class User {
+public class Resource {
     @Id
-    private String id;
-    private String name;
-    private LocalDateTime registered;
-    private String token;
+    private String uuid;
+    private long todoistId;
 }

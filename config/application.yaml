@@ -15,6 +15,6 @@ todoist:
   uri: https://api.todoist.com/sync/v8/sync
 
 db:
-  namespace: ptpb
+  namespace: ptpb-wrapper
   port: 3000
   host: localhost

@@ -33,4 +33,20 @@
         <appender-ref ref="ConsoleAppender"/>
     </logger>
 
+    <logger name="org.springframework" level="INFO" additivity="false">
+        <appender-ref ref="RollingFileAppender"/>
+        <appender-ref ref="ConsoleAppender"/>
+    </logger>
+
+    <logger name="javax.ws.rs.client" level="DEBUG" additivity="false">
+        <appender-ref ref="RollingFileAppender"/>
+        <appender-ref ref="ConsoleAppender"/>
+    </logger>
+
+    <logger name="com.fasterxml.jackson" level="DEBUG" additivity="false">
+        <appender-ref ref="RollingFileAppender"/>
+        <appender-ref ref="ConsoleAppender"/>
+    </logger>
+
+
 </configuration>

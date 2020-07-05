@@ -60,7 +60,9 @@ public class TodoistClientService {
         form.param(TOKEN, token);
         form.param(COMMANDS, objectMapper.writeValueAsString(commands));
 
-        return send(TodoistResponse.class, form);
+        String response = send(String.class, form);
+        log.debug("todoist response string: " + response);
+        return objectMapper.readValue(response, TodoistResponse.class);
     }
 
     private <T> T send(Class<T> clazz, Form form) {

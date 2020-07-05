@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
 import net.thumbtack.ptpb.wrapper.client.syncdata.*;
+import net.thumbtack.ptpb.wrapper.db.mapper.Resource;
+import net.thumbtack.ptpb.wrapper.db.mapper.ResourceDao;
 import net.thumbtack.ptpb.wrapper.db.sync.Sync;
 import net.thumbtack.ptpb.wrapper.db.sync.SyncDao;
 import net.thumbtack.ptpb.wrapper.db.todoist.Todoist;
@@ -28,27 +30,22 @@ import static net.thumbtack.ptpb.wrapper.client.syncdata.TodoistResourcesTypes.*
 public class SynchronizationService {
 
     private final ObjectMapper objectMapper;
-    //    private final UserDao userDao;
-//    private final ProjectDao projectDao;
-//    private final ItemDao itemDao;
     private final TodoistDao todoistDao;
     private final SyncDao syncDao;
+    private final ResourceDao resourceDao;
 
     private final TodoistClientService todoistClientService;
 
     private final String DEFAULT_TOKEN = "*";
 
     public SynchronizationService(ObjectMapper mapper,
-                                  //UserDao userDao, ProjectDao projectDao, ItemDao itemDao,
-                                  TodoistDao todoistDao,
-                                  SyncDao syncDao, TodoistClientService todoistClientService,
+                                  TodoistDao todoistDao, SyncDao syncDao, ResourceDao resourceDao,
+                                  TodoistClientService todoistClientService,
                                   RabbitMqMessageProvider provider) {
         this.objectMapper = mapper;
-//        this.userDao = userDao;
-//        this.projectDao = projectDao;
-//        this.itemDao = itemDao;
         this.todoistDao = todoistDao;
         this.syncDao = syncDao;
+        this.resourceDao = resourceDao;
         this.todoistClientService = todoistClientService;
 
         provider.registerHandler(SyncUserTokenAmqpRequest.class.getSimpleName(), this::syncUserToken);
@@ -105,16 +102,28 @@ public class SynchronizationService {
 
             String token = todoist.get().getToken();
             List<TodoistCommand> commands = new LinkedList<>();
+            Map<String, String> uuidMapper = new HashMap<>(); //<tmpUui, ptpbUuid>;
 
-            for(ProjectAmqpDto project : request.getProjects()) {
-                commands.addAll(createAddProjectCommands(project));
+            for (ProjectAmqpDto project : request.getProjects()) {
+                String commandProjectUuid = UUID.randomUUID().toString();
+
+                Optional<Resource> projectResource = resourceDao.getResourceById(project.getId());
+                boolean isProjectExist = projectResource.isPresent();
+                if (isProjectExist) {
+                    commands.addAll(createUpdateProjectCommands(uuidMapper, project, commandProjectUuid, projectResource.get().getTodoistId()));
+                } else {
+                    commands.addAll(createAddProjectCommands(uuidMapper, project, commandProjectUuid));
+                }
             }
+            log.debug("commands: " + commands);
             TodoistResponse todoistResponse = todoistClientService.postData(token, commands);
 
-            List<String> errors = todoistResponse.getSyncStatus().values().stream().filter( p-> !isOkStatus(p)).collect(Collectors.toList());
+            List<String> errors = todoistResponse.getSyncStatus().values().stream().filter(p -> !isOkStatus(p)).collect(Collectors.toList());
             if (!errors.isEmpty()) {
                 return new ResponseWrapper(false, errors.toString());
             }
+
+            saveResourcesMap(todoistResponse.getTempIdMapping(), uuidMapper);
 
             SyncProjectsAmqpResponse syncProjectsAmqpResponse = SyncProjectsAmqpResponse.builder()
                     .userId(request.getUserId())
@@ -132,36 +141,110 @@ public class SynchronizationService {
         }
     }
 
-    private List<TodoistCommand> createAddProjectCommands(ProjectAmqpDto project) {
+    private void saveResourcesMap(Map<String, Long> tempIdMapping, Map<String, String> uuidMapper) {
+        for (String key : tempIdMapping.keySet()) {
+            Long todoistId = tempIdMapping.get(key);
+            String ptpbUuid = uuidMapper.get(key);
+            Resource resource = new Resource(ptpbUuid, todoistId);
+            resourceDao.insertResource(resource);
+        }
+    }
+
+    private List<TodoistCommand> createAddProjectCommands(Map<String, String> uuidMapper, ProjectAmqpDto project, String projectCommandUuid) {
         List<TodoistCommand> commands = new LinkedList<>();
+        String COMMAND_TYPE_PROJECT_ADD = "project_add";
+        String COMMAND_ARG_PROJECT_NAME = "name";
+        String projectTempId = UUID.randomUUID().toString();
+        uuidMapper.put(projectTempId, project.getId());
 
-        String addProjectCommandUuid = UUID.randomUUID().toString();
-        String tempId = UUID.randomUUID().toString();
-
-        TodoistCommand addProjectCommand = TodoistCommand.builder()
-                .type("project_add")
-                .tempId(tempId)
-                .uuid(addProjectCommandUuid)
-                .arg("name", project.getName())
+        TodoistCommand projectCommand = TodoistCommand.builder()
+                .type(COMMAND_TYPE_PROJECT_ADD)
+                .tempId(projectTempId)
+                .uuid(projectCommandUuid)
+                .arg(COMMAND_ARG_PROJECT_NAME, project.getName())
                 .build();
-        commands.add(addProjectCommand);
+        commands.add(projectCommand);
 
-        for(ItemAmqpDto item: project.getItems()) {
-            String addItemCommandUuid = UUID.randomUUID().toString();
-
-            TodoistCommand addItemCommand = TodoistCommand.builder()
-                    .type("item_add")
-                    .tempId(UUID.randomUUID().toString())
-                    .uuid(addItemCommandUuid)
-                    .arg("content", item.getContent())
-                    .arg("project_id", tempId)
-                    .build();
-
-            commands.add(addItemCommand);
+        for (ItemAmqpDto item : project.getItems()) {
+            String itemCommandUuid = UUID.randomUUID().toString();
+            commands.add(createAddItemCommand(uuidMapper, item, itemCommandUuid, projectTempId));
         }
         return commands;
     }
 
+    private List<TodoistCommand> createUpdateProjectCommands(Map<String, String> uuidMapper, ProjectAmqpDto project, String commandUuid, long projectId) {
+        List<TodoistCommand> commands = new LinkedList<>();
+        String COMMAND_TYPE_PROJECT_UPDATE = "project_update";
+        String COMMAND_ARG_PROJECT_NAME = "name";
+        String COMMAND_ARG_PROJECT_ID = "id";
+
+        TodoistCommand projectCommand = TodoistCommand.builder()
+                .type(COMMAND_TYPE_PROJECT_UPDATE)
+                .uuid(commandUuid)
+                .arg(COMMAND_ARG_PROJECT_ID, projectId)
+                .arg(COMMAND_ARG_PROJECT_NAME, project.getName())
+                .build();
+        commands.add(projectCommand);
+
+        for (ItemAmqpDto item : project.getItems()) {
+            String itemCommandUuid = UUID.randomUUID().toString();
+
+            Optional<Resource> itemResource = resourceDao.getResourceById(item.getId());
+            boolean isItemExist = itemResource.isPresent();
+            if (isItemExist) {
+                commands.add(createUpdateItemCommand(item, itemCommandUuid, itemResource.get().getTodoistId()));
+            } else {
+                commands.add(createAddItemCommand(uuidMapper, item, itemCommandUuid, projectId));
+            }
+        }
+        return commands;
+
+    }
+
+    private TodoistCommand createAddItemCommand(Map<String, String> uuidMapper, ItemAmqpDto item, String commandUuid, String projectTempUuid) {
+        String COMMAND_TYPE_ITEM_ADD = "item_add";
+        String COMMAND_ARG_CONTENT = "content";
+        String COMMAND_ARG_PROJECT_ID = "project_id";
+
+        String tmpUuid = UUID.randomUUID().toString();
+        uuidMapper.put(tmpUuid, item.getId());
+        return TodoistCommand.builder()
+                .type(COMMAND_TYPE_ITEM_ADD)
+                .tempId(tmpUuid)
+                .uuid(commandUuid)
+                .arg(COMMAND_ARG_CONTENT, item.getContent())
+                .arg(COMMAND_ARG_PROJECT_ID, projectTempUuid)
+                .build();
+    }
+
+    private TodoistCommand createAddItemCommand(Map<String, String> uuidMapper, ItemAmqpDto item, String commandUuid, long projectId) {
+        String COMMAND_TYPE_ITEM_ADD = "item_add";
+        String COMMAND_ARG_CONTENT = "content";
+        String COMMAND_ARG_PROJECT_ID = "project_id";
+
+        String tmpUuid = UUID.randomUUID().toString();
+        uuidMapper.put(tmpUuid, item.getId());
+        return TodoistCommand.builder()
+                .type(COMMAND_TYPE_ITEM_ADD)
+                .tempId(tmpUuid)
+                .uuid(commandUuid)
+                .arg(COMMAND_ARG_CONTENT, item.getContent())
+                .arg(COMMAND_ARG_PROJECT_ID, projectId)
+                .build();
+    }
+
+    private TodoistCommand createUpdateItemCommand(ItemAmqpDto item, String commandUuid, long itemId) {
+        String COMMAND_TYPE_ITEM_UPDATE = "item_update";
+        String COMMAND_ARG_CONTENT = "content";
+        String COMMAND_ARG_ITEM_ID = "id";
+
+        return TodoistCommand.builder()
+                .type(COMMAND_TYPE_ITEM_UPDATE)
+                .uuid(commandUuid)
+                .arg(COMMAND_ARG_CONTENT, item.getContent())
+                .arg(COMMAND_ARG_ITEM_ID, itemId)
+                .build();
+    }
 
 
 //    public ResponseWrapper syncProjects(String data) {
@@ -439,7 +522,7 @@ public class SynchronizationService {
 //        }
 //    }
 
-//    private String getSyncTokenByUserId(long userId) {
+    //    private String getSyncTokenByUserId(long userId) {
 //        return syncDao.getSyncTokenByUserId(userId)
 //                .orElse(Sync.builder()
 //                        .syncToken(DEFAULT_TOKEN)
