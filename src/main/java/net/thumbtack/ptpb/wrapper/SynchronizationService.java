@@ -137,6 +137,7 @@ public class SynchronizationService {
                     .data(objectMapper.writeValueAsString(syncProjectsAmqpResponse))
                     .build();
         } catch (JsonProcessingException e) {
+            e.printStackTrace();
             return new ResponseWrapper(false, e.getMessage());
         }
     }

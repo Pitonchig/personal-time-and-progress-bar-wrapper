@@ -7,18 +7,11 @@ import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.TimeZone;
+
 //@EnableRabbit
 @Configuration
 public class PtpbWrapperServiceConfiguration {
-
-//    @Bean
-//    public SynchronizationService getSynchronizationService(ObjectMapper mapper, UserDao userDao, ProjectDao projectDao,
-//                                                            ProjectMapper projectMapper, ItemDao itemDao,
-//                                                            SyncDao syncDao, TodoistClientService todoistClientService, RabbitMqMessageProvider rabbitMqMessageProvider) {
-//        SynchronizationService service = new SynchronizationService(mapper, userDao, projectDao, itemDao, syncDao, todoistClientService);
-//        rabbitMqMessageProvider.registerHandler(SyncUserAmqpRequest.class.getSimpleName(), service::syncUser);
-//        return service;
-//    }
 
     @Bean
     public RabbitTemplate rabbitTemplate(final ConnectionFactory connectionFactory) {

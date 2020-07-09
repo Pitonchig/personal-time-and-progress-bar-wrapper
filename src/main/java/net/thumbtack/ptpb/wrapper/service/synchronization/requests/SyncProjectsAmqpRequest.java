@@ -1,5 +1,6 @@
 package net.thumbtack.ptpb.wrapper.service.synchronization.requests;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,6 +13,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonSerialize
 public class SyncProjectsAmqpRequest {
     private String userId;
     private boolean toTodoist;

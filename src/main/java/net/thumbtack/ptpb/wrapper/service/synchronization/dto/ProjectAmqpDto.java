@@ -1,5 +1,6 @@
 package net.thumbtack.ptpb.wrapper.service.synchronization.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.*;
 
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonSerialize
 public class ProjectAmqpDto {
     private String id;
     private String name;
