@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
+import net.thumbtack.ptpb.wrapper.client.item.ItemDto;
+import net.thumbtack.ptpb.wrapper.client.project.ProjectDto;
 import net.thumbtack.ptpb.wrapper.client.syncdata.*;
 import net.thumbtack.ptpb.wrapper.db.mapper.Resource;
 import net.thumbtack.ptpb.wrapper.db.mapper.ResourceDao;
@@ -75,7 +77,7 @@ public class SynchronizationService {
                     .userId(request.getUserId())
                     .syncToken(response.getToken())
                     .build();
-            syncDao.updateSyncs(Collections.singletonList(sync));
+            syncDao.updateSync(sync);
 
             SyncUserTokenAmqpResponse syncUserTokenAmqpResponse = SyncUserTokenAmqpResponse.builder()
                     .isValid(isTokenValid)
@@ -101,35 +103,45 @@ public class SynchronizationService {
             }
 
             String token = todoist.get().getToken();
-            List<TodoistCommand> commands = new LinkedList<>();
-            Map<String, String> uuidMapper = new HashMap<>(); //<tmpUui, ptpbUuid>;
+            List<ProjectAmqpDto> projects = request.getProjects();
+            if (request.isToTodoist()) {
+                List<TodoistCommand> commands = new LinkedList<>();
+                Map<String, String> uuidMapper = new HashMap<>(); //<tmpUui, ptpbUuid>;
 
-            for (ProjectAmqpDto project : request.getProjects()) {
-                String commandProjectUuid = UUID.randomUUID().toString();
+                for (ProjectAmqpDto project : projects) {
+                    String commandProjectUuid = UUID.randomUUID().toString();
 
-                Optional<Resource> projectResource = resourceDao.getResourceById(project.getId());
-                boolean isProjectExist = projectResource.isPresent();
-                if (isProjectExist) {
-                    commands.addAll(createUpdateProjectCommands(uuidMapper, project, commandProjectUuid, projectResource.get().getTodoistId()));
-                } else {
-                    commands.addAll(createAddProjectCommands(uuidMapper, project, commandProjectUuid));
+                    Optional<Resource> projectResource = resourceDao.getResourceById(project.getId());
+                    boolean isProjectExist = projectResource.isPresent();
+                    if (isProjectExist) {
+                        commands.addAll(createUpdateProjectCommands(uuidMapper, project, commandProjectUuid, projectResource.get().getTodoistId()));
+                    } else {
+                        commands.addAll(createAddProjectCommands(uuidMapper, project, commandProjectUuid));
+                    }
                 }
+                log.debug("commands: " + commands);
+                TodoistResponse todoistResponse = todoistClientService.postData(token, commands);
+                List<String> errors = todoistResponse.getSyncStatus().values().stream().filter(p -> !isOkStatus(p)).collect(Collectors.toList());
+                if (!errors.isEmpty()) {
+                    return new ResponseWrapper(false, errors.toString());
+                }
+                saveResourcesMap(todoistResponse.getTempIdMapping(), uuidMapper);
             }
-            log.debug("commands: " + commands);
-            TodoistResponse todoistResponse = todoistClientService.postData(token, commands);
 
-            List<String> errors = todoistResponse.getSyncStatus().values().stream().filter(p -> !isOkStatus(p)).collect(Collectors.toList());
-            if (!errors.isEmpty()) {
-                return new ResponseWrapper(false, errors.toString());
+            if (request.isFromTodoist()) {
+                List<TodoistResourcesTypes> resources = new LinkedList<>();
+                resources.add(PROJECTS);
+                resources.add(ITEMS);
+                SyncResponse response = todoistClientService.getSyncData(token, getSyncTokenByUserId(request.getUserId()), resources);
+
+                projects = createProjectAmqpList(projects, response);
             }
-
-            saveResourcesMap(todoistResponse.getTempIdMapping(), uuidMapper);
 
             SyncProjectsAmqpResponse syncProjectsAmqpResponse = SyncProjectsAmqpResponse.builder()
                     .userId(request.getUserId())
                     .fromTodoist(request.isFromTodoist())
                     .toTodoist(request.isToTodoist())
-                    .projects(request.getProjects())
+                    .projects(projects)
                     .build();
 
             return ResponseWrapper.builder()
@@ -142,13 +154,83 @@ public class SynchronizationService {
         }
     }
 
+    private List<ProjectAmqpDto> createProjectAmqpList(List<ProjectAmqpDto> projects, SyncResponse response) {
+        List<ProjectAmqpDto> projectAmqpDtoList = new LinkedList<>();
+        for (ProjectDto projectDto : response.getProjects()) {
+            Resource resource = getOrCreateResourceByTodoistId(projectDto.getId());
+
+            List<ItemAmqpDto> itemAmqpDtoList = createItemAmqpList(response.getItems(), projectDto.getId());
+            ProjectAmqpDto projectAmqpDto = projects.stream()
+                    .filter(p -> p.getId() == resource.getUuid())
+                    .findFirst()
+                    .orElse(ProjectAmqpDto.builder()
+                            .id(resource.getUuid())
+                            .name(projectDto.getName())
+                            .items(itemAmqpDtoList)
+                            .build());
+
+            projectAmqpDtoList.add(projectAmqpDto);
+        }
+        return projectAmqpDtoList;
+    }
+
+    private Resource getOrCreateResourceByTodoistId(long todoistId) {
+        Optional<Resource> resourceOptional = resourceDao.getResourcesByTodoistId(todoistId).stream().findFirst();
+        Resource resource;
+        if (resourceOptional.isEmpty()) {
+            resource = Resource.builder()
+                    .uuid(UUID.randomUUID().toString())
+                    .todoistId(todoistId)
+                    .build();
+            resourceDao.insertResource(resource);
+        } else {
+            resource = resourceOptional.get();
+        }
+        return resource;
+    }
+
+    private List<ItemAmqpDto> createItemAmqpList(List<ItemDto> items, Long id) {
+        List<ItemAmqpDto> itemAmqpDtoList = new LinkedList<>();
+
+        items.stream()
+                .filter(i -> i.getProjectId() == id)
+                .collect(Collectors.toList())
+                .forEach(i -> {
+                    Resource resource = getOrCreateResourceByTodoistId(i.getId());
+                    ItemAmqpDto item = ItemAmqpDto.builder()
+                            .id(resource.getUuid())
+                            .content(i.getContent())
+                            .isCompleted(i.isChecked())
+                            .build();
+                    itemAmqpDtoList.add(item);
+                });
+
+        return itemAmqpDtoList;
+    }
+
+    private String getSyncTokenByUserId(String uuid) {
+        return syncDao.getSyncTokenByUserId(uuid)
+                .orElse(Sync.builder()
+                        .userId(uuid)
+                        .syncToken(DEFAULT_TOKEN)
+                        .build())
+                .getSyncToken();
+    }
+
+    private boolean isOkStatus(String status) {
+        return status.equals("ok");
+    }
+
+
     private void saveResourcesMap(Map<String, Long> tempIdMapping, Map<String, String> uuidMapper) {
+        List<Resource> resourceList = new LinkedList<>();
         for (String key : tempIdMapping.keySet()) {
             Long todoistId = tempIdMapping.get(key);
             String ptpbUuid = uuidMapper.get(key);
             Resource resource = new Resource(ptpbUuid, todoistId);
-            resourceDao.insertResource(resource);
+            resourceList.add(resource);
         }
+        resourceDao.insertResources(resourceList);
     }
 
     private List<TodoistCommand> createAddProjectCommands(Map<String, String> uuidMapper, ProjectAmqpDto project, String projectCommandUuid) {
@@ -522,18 +604,6 @@ public class SynchronizationService {
 //            return new ResponseWrapper(false, e.getMessage());
 //        }
 //    }
-
-    //    private String getSyncTokenByUserId(long userId) {
-//        return syncDao.getSyncTokenByUserId(userId)
-//                .orElse(Sync.builder()
-//                        .syncToken(DEFAULT_TOKEN)
-//                        .build())
-//                .getSyncToken();
-//    }
-//
-    private boolean isOkStatus(String status) {
-        return status.equals("ok");
-    }
 
 //    private List<GetItemAmqpResponse> getItemAmqpResponseListByProjectId(long projectId) {
 //        List<Item> items = itemDao.getItemsByProjectId(projectId);

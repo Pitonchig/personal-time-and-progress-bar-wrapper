@@ -16,15 +16,11 @@ public class SyncDao {
         syncMapper.save(sync);
     }
 
-    public Optional<Sync> getSyncTokenByUserId(long userId) {
+    public Optional<Sync> getSyncTokenByUserId(String userId) {
         return syncMapper.findById(userId);
     }
 
-    public void updateSyncs(List<Sync> syncs) {
-        syncMapper.saveAll(syncs);
-    }
-
-    public void deleteAllSyncs() {
+     public void deleteAllSyncs() {
         syncMapper.deleteAll();
     }
 }
