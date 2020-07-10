@@ -22,6 +22,7 @@ import net.thumbtack.ptpb.wrapper.service.synchronization.responses.SyncProjects
 import net.thumbtack.ptpb.wrapper.service.synchronization.responses.SyncUserTokenAmqpResponse;
 import org.springframework.stereotype.Component;
 
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -158,6 +159,7 @@ public class SynchronizationService {
         List<ProjectAmqpDto> projectAmqpDtoList = new LinkedList<>();
         for (ProjectDto projectDto : response.getProjects()) {
             Resource resource = getOrCreateResourceByTodoistId(projectDto.getId());
+            if(projectDto.isDeleted()) continue;
 
             List<ItemAmqpDto> itemAmqpDtoList = createItemAmqpList(response.getItems(), projectDto.getId());
             ProjectAmqpDto projectAmqpDto = projects.stream()
@@ -193,7 +195,7 @@ public class SynchronizationService {
         List<ItemAmqpDto> itemAmqpDtoList = new LinkedList<>();
 
         items.stream()
-                .filter(i -> i.getProjectId() == id)
+                .filter(i -> !i.isDeleted() && i.getProjectId() == id )
                 .collect(Collectors.toList())
                 .forEach(i -> {
                     Resource resource = getOrCreateResourceByTodoistId(i.getId());
@@ -250,7 +252,7 @@ public class SynchronizationService {
 
         for (ItemAmqpDto item : project.getItems()) {
             String itemCommandUuid = UUID.randomUUID().toString();
-            commands.add(createAddItemCommand(uuidMapper, item, itemCommandUuid, projectTempId));
+            commands.addAll(createAddItemCommand(uuidMapper, item, itemCommandUuid, projectTempId));
         }
         return commands;
     }
@@ -275,57 +277,116 @@ public class SynchronizationService {
             Optional<Resource> itemResource = resourceDao.getResourceById(item.getId());
             boolean isItemExist = itemResource.isPresent();
             if (isItemExist) {
-                commands.add(createUpdateItemCommand(item, itemCommandUuid, itemResource.get().getTodoistId()));
+                commands.addAll(createUpdateItemCommand(item, itemCommandUuid, itemResource.get().getTodoistId()));
             } else {
-                commands.add(createAddItemCommand(uuidMapper, item, itemCommandUuid, projectId));
+                commands.addAll(createAddItemCommand(uuidMapper, item, itemCommandUuid, projectId));
             }
         }
         return commands;
 
     }
 
-    private TodoistCommand createAddItemCommand(Map<String, String> uuidMapper, ItemAmqpDto item, String commandUuid, String projectTempUuid) {
+    private List<TodoistCommand> createAddItemCommand(Map<String, String> uuidMapper, ItemAmqpDto item, String commandUuid, String projectTempUuid) {
+        List<TodoistCommand> commands = new LinkedList<>();
         String COMMAND_TYPE_ITEM_ADD = "item_add";
         String COMMAND_ARG_CONTENT = "content";
         String COMMAND_ARG_PROJECT_ID = "project_id";
 
         String tmpUuid = UUID.randomUUID().toString();
         uuidMapper.put(tmpUuid, item.getId());
-        return TodoistCommand.builder()
+
+        TodoistCommand addItemCommand = TodoistCommand.builder()
                 .type(COMMAND_TYPE_ITEM_ADD)
                 .tempId(tmpUuid)
                 .uuid(commandUuid)
                 .arg(COMMAND_ARG_CONTENT, item.getContent())
                 .arg(COMMAND_ARG_PROJECT_ID, projectTempUuid)
                 .build();
+        commands.add(addItemCommand);
+
+        if(item.isCompleted()) {
+            String completeCommandUuid = UUID.randomUUID().toString();
+            TodoistCommand completeItemCommand = createCompleteItemCommand(item, completeCommandUuid, tmpUuid );
+            commands.add(completeItemCommand);
+        }
+
+        return commands;
     }
 
-    private TodoistCommand createAddItemCommand(Map<String, String> uuidMapper, ItemAmqpDto item, String commandUuid, long projectId) {
+    private List<TodoistCommand> createAddItemCommand(Map<String, String> uuidMapper, ItemAmqpDto item, String commandUuid, long projectId) {
+        List<TodoistCommand> commands = new LinkedList<>();
         String COMMAND_TYPE_ITEM_ADD = "item_add";
         String COMMAND_ARG_CONTENT = "content";
         String COMMAND_ARG_PROJECT_ID = "project_id";
 
         String tmpUuid = UUID.randomUUID().toString();
         uuidMapper.put(tmpUuid, item.getId());
-        return TodoistCommand.builder()
+        TodoistCommand addItemCommand = TodoistCommand.builder()
                 .type(COMMAND_TYPE_ITEM_ADD)
                 .tempId(tmpUuid)
                 .uuid(commandUuid)
                 .arg(COMMAND_ARG_CONTENT, item.getContent())
                 .arg(COMMAND_ARG_PROJECT_ID, projectId)
                 .build();
+        commands.add(addItemCommand);
+
+        if(item.isCompleted()) {
+            String completeCommandUuid = UUID.randomUUID().toString();
+            TodoistCommand completeItemCommand = createCompleteItemCommand(item, completeCommandUuid, tmpUuid );
+            commands.add(completeItemCommand);
+        }
+
+        return commands;
     }
 
-    private TodoistCommand createUpdateItemCommand(ItemAmqpDto item, String commandUuid, long itemId) {
+    private List<TodoistCommand> createUpdateItemCommand(ItemAmqpDto item, String commandUuid, long itemId) {
+        List<TodoistCommand> commands = new LinkedList<>();
+
         String COMMAND_TYPE_ITEM_UPDATE = "item_update";
         String COMMAND_ARG_CONTENT = "content";
         String COMMAND_ARG_ITEM_ID = "id";
 
-        return TodoistCommand.builder()
+        TodoistCommand addItemCommand =  TodoistCommand.builder()
                 .type(COMMAND_TYPE_ITEM_UPDATE)
                 .uuid(commandUuid)
                 .arg(COMMAND_ARG_CONTENT, item.getContent())
                 .arg(COMMAND_ARG_ITEM_ID, itemId)
+                .build();
+
+        commands.add(addItemCommand);
+
+        if(item.isCompleted()) {
+            String completeCommandUuid = UUID.randomUUID().toString();
+            TodoistCommand completeItemCommand = createCompleteItemCommand(item, completeCommandUuid, itemId );
+            commands.add(completeItemCommand);
+        }
+
+        return commands;
+    }
+
+    private TodoistCommand createCompleteItemCommand(ItemAmqpDto item, String commandUuid, long itemId) {
+        String COMMAND_TYPE_ITEM_UPDATE = "item_complete";
+        String COMMAND_ARG_ITEM_ID = "id";
+        String COMMAND_ARG_DATE_COMPLETED = "date_completed";
+
+        return TodoistCommand.builder()
+                .type(COMMAND_TYPE_ITEM_UPDATE)
+                .uuid(commandUuid)
+                .arg(COMMAND_ARG_ITEM_ID, itemId)
+                .arg(COMMAND_ARG_DATE_COMPLETED, item.getFinish().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")))
+                .build();
+    }
+
+    private TodoistCommand createCompleteItemCommand(ItemAmqpDto item, String commandUuid, String tmpItemId) {
+        String COMMAND_TYPE_ITEM_UPDATE = "item_complete";
+        String COMMAND_ARG_ITEM_ID = "id";
+        String COMMAND_ARG_DATE_COMPLETED = "date_completed";
+
+        return TodoistCommand.builder()
+                .type(COMMAND_TYPE_ITEM_UPDATE)
+                .uuid(commandUuid)
+                .arg(COMMAND_ARG_ITEM_ID, tmpItemId)
+                .arg(COMMAND_ARG_DATE_COMPLETED, item.getFinish().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")))
                 .build();
     }
 

@@ -27,6 +27,8 @@ public class ItemDto {
     private String dateAdded;
     @JsonProperty("date_completed")
     private String dateCompleted;
+    @JsonProperty("is_deleted")
+    private boolean isDeleted;
 
 //    @JsonProperty("legacy_id")
 //    private long legacy_id;

@@ -7,8 +7,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ItemClient {
 
-    public void addItem(ItemDto item) {
-
-    }
+//    public void addItem(ItemDto item) {
+//
+//    }
 
 }
