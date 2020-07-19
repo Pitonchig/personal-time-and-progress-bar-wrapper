@@ -15,4 +15,5 @@ public class ProjectAmqpDto {
     private String name;
     @Singular
     List<ItemAmqpDto> items;
+    private boolean isDeleted;
 }

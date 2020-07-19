@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 
 @Data
 @Builder
@@ -19,9 +20,13 @@ public class ItemAmqpDto {
     private String id;
     private String content;
     @JsonFormat(shape = JsonFormat.Shape.STRING, timezone = "UTC")
-    private LocalDateTime start;
+    private ZonedDateTime start;
     @JsonFormat(shape = JsonFormat.Shape.STRING, timezone = "UTC")
-    private LocalDateTime finish;
+    private ZonedDateTime finish;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, timezone = "UTC")
+    private ZonedDateTime completion;
     @JsonProperty("isCompleted")
     private boolean isCompleted;
+    @JsonProperty("isDeleted")
+    private boolean isDeleted;
 }

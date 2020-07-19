@@ -1,11 +1,14 @@
 package net.thumbtack.ptpb.wrapper.client.item;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.ZonedDateTime;
 
 @Data
 @Builder
@@ -29,13 +32,14 @@ public class ItemDto {
     private String dateCompleted;
     @JsonProperty("is_deleted")
     private boolean isDeleted;
+    private DueDto due;
 
 //    @JsonProperty("legacy_id")
 //    private long legacy_id;
 //    @JsonProperty("legacy_project_id")
 //    private long legacyProjectId;
 //    private int priority;
-//    private DueDto due;
+
 //    @JsonProperty("legacy_parent_id")
 //    private long legacyParentId;
 //    @JsonProperty("child_order")

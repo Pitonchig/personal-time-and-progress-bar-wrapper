@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
+import net.thumbtack.ptpb.wrapper.client.item.DueDto;
 import net.thumbtack.ptpb.wrapper.client.item.ItemDto;
 import net.thumbtack.ptpb.wrapper.client.project.ProjectDto;
 import net.thumbtack.ptpb.wrapper.client.syncdata.*;
@@ -22,6 +23,8 @@ import net.thumbtack.ptpb.wrapper.service.synchronization.responses.SyncProjects
 import net.thumbtack.ptpb.wrapper.service.synchronization.responses.SyncUserTokenAmqpResponse;
 import org.springframework.stereotype.Component;
 
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -159,7 +162,7 @@ public class SynchronizationService {
         List<ProjectAmqpDto> projectAmqpDtoList = new LinkedList<>();
         for (ProjectDto projectDto : response.getProjects()) {
             Resource resource = getOrCreateResourceByTodoistId(projectDto.getId());
-            if(projectDto.isDeleted()) continue;
+            if (projectDto.isDeleted()) continue;
 
             List<ItemAmqpDto> itemAmqpDtoList = createItemAmqpList(response.getItems(), projectDto.getId());
             ProjectAmqpDto projectAmqpDto = projects.stream()
@@ -169,6 +172,7 @@ public class SynchronizationService {
                             .id(resource.getUuid())
                             .name(projectDto.getName())
                             .items(itemAmqpDtoList)
+                            .isDeleted(projectDto.isDeleted())
                             .build());
 
             projectAmqpDtoList.add(projectAmqpDto);
@@ -191,18 +195,33 @@ public class SynchronizationService {
         return resource;
     }
 
+    private ZonedDateTime parseZonedDateTime(String dt) {
+        if (dt == null) {
+            return null;
+        }
+        return ZonedDateTime.parse(dt, DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss['Z']").withZone(ZoneId.of("UTC")));
+        //return ZonedDateTime.parse(dt, DateTimeFormatter.ISO_INSTANT.withZone(ZoneId.of("UTC")));
+    }
+
     private List<ItemAmqpDto> createItemAmqpList(List<ItemDto> items, Long id) {
         List<ItemAmqpDto> itemAmqpDtoList = new LinkedList<>();
 
         items.stream()
-                .filter(i -> !i.isDeleted() && i.getProjectId() == id )
+                .filter(i -> !i.isDeleted() && i.getProjectId() == id)
                 .collect(Collectors.toList())
                 .forEach(i -> {
                     Resource resource = getOrCreateResourceByTodoistId(i.getId());
+                    ZonedDateTime start = parseZonedDateTime(i.getDateAdded());
+                    ZonedDateTime finish = parseZonedDateTime(i.getDue().getDate());
+                    ZonedDateTime completion = parseZonedDateTime(i.getDateCompleted());
                     ItemAmqpDto item = ItemAmqpDto.builder()
                             .id(resource.getUuid())
                             .content(i.getContent())
                             .isCompleted(i.isChecked())
+                            .isDeleted(i.isDeleted())
+                            .start(start)
+                            .finish(finish)
+                            .completion(completion)
                             .build();
                     itemAmqpDtoList.add(item);
                 });
@@ -254,6 +273,12 @@ public class SynchronizationService {
             String itemCommandUuid = UUID.randomUUID().toString();
             commands.addAll(createAddItemCommand(uuidMapper, item, itemCommandUuid, projectTempId));
         }
+
+        if (project.isDeleted()) {
+            String projectDeleteCommandUuid = UUID.randomUUID().toString();
+            commands.add(createDeleteProjectCommand(projectDeleteCommandUuid, projectTempId));
+        }
+
         return commands;
     }
 
@@ -282,6 +307,12 @@ public class SynchronizationService {
                 commands.addAll(createAddItemCommand(uuidMapper, item, itemCommandUuid, projectId));
             }
         }
+
+        if (project.isDeleted()) {
+            String projectDeleteCommandUuid = UUID.randomUUID().toString();
+            commands.add(createDeleteProjectCommand(projectDeleteCommandUuid, projectId));
+        }
+
         return commands;
 
     }
@@ -291,9 +322,17 @@ public class SynchronizationService {
         String COMMAND_TYPE_ITEM_ADD = "item_add";
         String COMMAND_ARG_CONTENT = "content";
         String COMMAND_ARG_PROJECT_ID = "project_id";
+        String COMMAND_ARG_ITEM_DUE = "due";
 
         String tmpUuid = UUID.randomUUID().toString();
         uuidMapper.put(tmpUuid, item.getId());
+
+        DueDto due = DueDto.builder()
+                .isRecurring(false)
+                .lang("en")
+                .timezone("UTC")
+                .date(item.getFinish().format(DateTimeFormatter.ISO_INSTANT))
+                .build();
 
         TodoistCommand addItemCommand = TodoistCommand.builder()
                 .type(COMMAND_TYPE_ITEM_ADD)
@@ -301,13 +340,20 @@ public class SynchronizationService {
                 .uuid(commandUuid)
                 .arg(COMMAND_ARG_CONTENT, item.getContent())
                 .arg(COMMAND_ARG_PROJECT_ID, projectTempUuid)
+                .arg(COMMAND_ARG_ITEM_DUE, due)
                 .build();
         commands.add(addItemCommand);
 
-        if(item.isCompleted()) {
+        if (item.isCompleted()) {
             String completeCommandUuid = UUID.randomUUID().toString();
-            TodoistCommand completeItemCommand = createCompleteItemCommand(item, completeCommandUuid, tmpUuid );
+            TodoistCommand completeItemCommand = createCompleteItemCommand(item, completeCommandUuid, tmpUuid);
             commands.add(completeItemCommand);
+        }
+
+        if (item.isDeleted()) {
+            String deleteCommandUuid = UUID.randomUUID().toString();
+            TodoistCommand deleteItemCommand = createDeleteItemCommand(deleteCommandUuid, tmpUuid);
+            commands.add(deleteItemCommand);
         }
 
         return commands;
@@ -318,22 +364,38 @@ public class SynchronizationService {
         String COMMAND_TYPE_ITEM_ADD = "item_add";
         String COMMAND_ARG_CONTENT = "content";
         String COMMAND_ARG_PROJECT_ID = "project_id";
+        String COMMAND_ARG_ITEM_DUE = "due";
 
         String tmpUuid = UUID.randomUUID().toString();
         uuidMapper.put(tmpUuid, item.getId());
+
+        DueDto due = DueDto.builder()
+                .isRecurring(false)
+                .lang("en")
+                .timezone("UTC")
+                .date(item.getFinish().format(DateTimeFormatter.ISO_INSTANT))
+                .build();
+
         TodoistCommand addItemCommand = TodoistCommand.builder()
                 .type(COMMAND_TYPE_ITEM_ADD)
                 .tempId(tmpUuid)
                 .uuid(commandUuid)
                 .arg(COMMAND_ARG_CONTENT, item.getContent())
                 .arg(COMMAND_ARG_PROJECT_ID, projectId)
+                .arg(COMMAND_ARG_ITEM_DUE, due)
                 .build();
         commands.add(addItemCommand);
 
-        if(item.isCompleted()) {
+        if (item.isCompleted()) {
             String completeCommandUuid = UUID.randomUUID().toString();
-            TodoistCommand completeItemCommand = createCompleteItemCommand(item, completeCommandUuid, tmpUuid );
+            TodoistCommand completeItemCommand = createCompleteItemCommand(item, completeCommandUuid, tmpUuid);
             commands.add(completeItemCommand);
+        }
+
+        if (item.isDeleted()) {
+            String deleteCommandUuid = UUID.randomUUID().toString();
+            TodoistCommand deleteItemCommand = createDeleteItemCommand(deleteCommandUuid, tmpUuid);
+            commands.add(deleteItemCommand);
         }
 
         return commands;
@@ -345,20 +407,36 @@ public class SynchronizationService {
         String COMMAND_TYPE_ITEM_UPDATE = "item_update";
         String COMMAND_ARG_CONTENT = "content";
         String COMMAND_ARG_ITEM_ID = "id";
+        String COMMAND_ARG_ITEM_DUE = "due";
 
-        TodoistCommand addItemCommand =  TodoistCommand.builder()
+        DueDto due = DueDto.builder()
+                .isRecurring(false)
+                .lang("en")
+                .timezone("UTC")
+                .date(item.getFinish().format(DateTimeFormatter.ISO_INSTANT))
+                .build();
+
+
+        TodoistCommand addItemCommand = TodoistCommand.builder()
                 .type(COMMAND_TYPE_ITEM_UPDATE)
                 .uuid(commandUuid)
                 .arg(COMMAND_ARG_CONTENT, item.getContent())
                 .arg(COMMAND_ARG_ITEM_ID, itemId)
+                .arg(COMMAND_ARG_ITEM_DUE, due)
                 .build();
 
         commands.add(addItemCommand);
 
-        if(item.isCompleted()) {
+        if (item.isCompleted()) {
             String completeCommandUuid = UUID.randomUUID().toString();
-            TodoistCommand completeItemCommand = createCompleteItemCommand(item, completeCommandUuid, itemId );
+            TodoistCommand completeItemCommand = createCompleteItemCommand(item, completeCommandUuid, itemId);
             commands.add(completeItemCommand);
+        }
+
+        if (item.isDeleted()) {
+            String deleteCommandUuid = UUID.randomUUID().toString();
+            TodoistCommand deleteItemCommand = createDeleteItemCommand(deleteCommandUuid, itemId);
+            commands.add(deleteItemCommand);
         }
 
         return commands;
@@ -373,7 +451,7 @@ public class SynchronizationService {
                 .type(COMMAND_TYPE_ITEM_UPDATE)
                 .uuid(commandUuid)
                 .arg(COMMAND_ARG_ITEM_ID, itemId)
-                .arg(COMMAND_ARG_DATE_COMPLETED, item.getFinish().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")))
+                .arg(COMMAND_ARG_DATE_COMPLETED, ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT))
                 .build();
     }
 
@@ -386,323 +464,52 @@ public class SynchronizationService {
                 .type(COMMAND_TYPE_ITEM_UPDATE)
                 .uuid(commandUuid)
                 .arg(COMMAND_ARG_ITEM_ID, tmpItemId)
-                .arg(COMMAND_ARG_DATE_COMPLETED, item.getFinish().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")))
+                .arg(COMMAND_ARG_DATE_COMPLETED, ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT))
                 .build();
     }
 
+    private TodoistCommand createDeleteItemCommand(String commandUuid, long itemId) {
+        String COMMAND_TYPE_ITEM_DELETE = "item_delete";
+        String COMMAND_ARG_ITEM_ID = "id";
 
-//    public ResponseWrapper syncProjects(String data) {
-//        try {
-//            SyncProjectsAmqpRequest request = objectMapper.readValue(data, SyncProjectsAmqpRequest.class);
-//            String token = "token";
-//
-//            List<TodoistResourcesTypes> resources = new LinkedList<>();
-//            resources.add(PROJECTS);
-//            resources.add(ITEMS);
-//            SyncResponse response = todoistClientService.getSyncData(token, DEFAULT_TOKEN, resources);
-//
-//
-//            Sync sync = Sync.builder()
-//                    .userId(request.getUserId())
-//                    .syncToken(response.getToken())
-//                    .build();
-//            syncDao.updateSyncs(Collections.singletonList(sync));
-//
-//            SyncProjectsAmqpResponse syncProjectsAmqpResponse = SyncProjectsAmqpResponse.builder()
-//                    .build();
-//
-//            return ResponseWrapper.builder()
-//                    .isOk(true)
-//                    .data(objectMapper.writeValueAsString(syncProjectsAmqpResponse))
-//                    .build();
-//
-//        } catch (JsonProcessingException e) {
-//            return new ResponseWrapper(false, e.getMessage());
-//        }
-//    }
+        return TodoistCommand.builder()
+                .type(COMMAND_TYPE_ITEM_DELETE)
+                .uuid(commandUuid)
+                .arg(COMMAND_ARG_ITEM_ID, itemId)
+                .build();
+    }
 
+    private TodoistCommand createDeleteItemCommand(String commandUuid, String tmpItemId) {
+        String COMMAND_TYPE_ITEM_DELETE = "item_delete";
+        String COMMAND_ARG_ITEM_ID = "id";
 
-//    public ResponseWrapper syncUser(String data) {
-//        try {
-//            SyncUserAmqpRequest request = objectMapper.readValue(data, SyncUserAmqpRequest.class);
-//
-//            List<TodoistResourcesTypes> resources = new LinkedList<>();
-//            resources.add(USER);
-//            resources.add(PROJECTS);
-//            resources.add(ITEMS);
-//            SyncResponse response = todoistClientService.getSyncData(request.getToken(), DEFAULT_TOKEN, resources);
-//
-//            List<ItemDto> itemsDto = response.getItems();
-//            List<ProjectDto> projectsDto = response.getProjects();
-//            UserDto userDto = response.getUser();
-//
-//            User user = UserStructMapper.toUser(userDto);
-//            user.setToken(request.getToken());
-//            userDao.insertUsers(Collections.singletonList(user));
-//            projectDao.insertProjects(ProjectStructMapper.toProjects(projectsDto, userDto.getId()));
-//            itemDao.insertItems(ItemStructMapper.toItems(itemsDto));
-//
-//            Sync sync = Sync.builder()
-//                    .userId(userDto.getId())
-//                    .syncToken(response.getToken())
-//                    .build();
-//            syncDao.updateSyncs(Collections.singletonList(sync));
-//
-//            SyncUserAmqpResponse syncUserAmqpResponse = SyncUserAmqpResponse.builder()
-//                    .id(request.getUserId())
-//                    .name(userDto.getFullName())
-//                    .registered(userDto.getRegistered())
-//                    .build();
-//
-//            return ResponseWrapper.builder()
-//                    .isOk(true)
-//                    .data(objectMapper.writeValueAsString(syncUserAmqpResponse))
-//                    .build();
-//
-//        } catch (JsonProcessingException e) {
-//            return new ResponseWrapper(false, e.getMessage());
-//        }
-//    }
+        return TodoistCommand.builder()
+                .type(COMMAND_TYPE_ITEM_DELETE)
+                .uuid(commandUuid)
+                .arg(COMMAND_ARG_ITEM_ID, tmpItemId)
+                .build();
+    }
 
-//
-//    public ResponseWrapper createItem(String data) {
-//        try {
-//            CreateItemAmqpRequest request = objectMapper.readValue(data, CreateItemAmqpRequest.class);
-//            Optional<User> userOptional = userDao.getUserById(request.getUserId());
-//            if (userOptional.isEmpty()) {
-//                return new ResponseWrapper(false, USER_NOT_FOUND.getMessage());
-//            }
-//
-//            String uuid = userOptional.get().getToken();
-//            String commandUuid = UUID.randomUUID().toString();
-//
-//            TodoistCommand todoistCommand = TodoistCommand.builder()
-//                    .type("item_add")
-//                    .tempId(UUID.randomUUID().toString())
-//                    .uuid(commandUuid)
-//                    .arg("content", request.getContent())
-//                    .arg("project_id", request.getProjectId())
-//                    .arg("priority", request.getPriority())
-//                    .build();
-//
-//            TodoistResponse todoistResponse = todoistClientService.postData(uuid, todoistCommand);
-//            boolean isOk = isOkStatus(todoistResponse.getSyncStatus().get(commandUuid));
-//            if (isOk) {
-//                syncUsersData(userOptional.get());
-//            }
-//            return new ResponseWrapper(isOk, "");
-//        } catch (JsonProcessingException e) {
-//            return new ResponseWrapper(false, e.getMessage());
-//        }
-//
-//    }
-//
-//    public ResponseWrapper createProject(String data) {
-//        try {
-//            CreateProjectAmqpRequest request = objectMapper.readValue(data, CreateProjectAmqpRequest.class);
-//            Optional<User> userOptional = userDao.getUserById(request.getUserId());
-//            if (userOptional.isEmpty()) {
-//                return new ResponseWrapper(false, USER_NOT_FOUND.getMessage());
-//            }
-//
-//            String uuid = userOptional.get().getToken();
-//            String commandUuid = UUID.randomUUID().toString();
-//
-//            TodoistCommand todoistCommand = TodoistCommand.builder()
-//                    .type("project_add")
-//                    .tempId(UUID.randomUUID().toString())
-//                    .uuid(commandUuid)
-//                    .arg("name", request.getName())
-//                    .arg("color", request.getColor())
-//                    .arg("is_favorite", request.isFavorite())
-//                    .build();
-//
-//            TodoistResponse todoistResponse = todoistClientService.postData(uuid, todoistCommand);
-//            boolean isOk = isOkStatus(todoistResponse.getSyncStatus().get(commandUuid));
-//            if (isOk) {
-//                syncUsersData(userOptional.get());
-//            }
-//            return new ResponseWrapper(isOk, "");
-//        } catch (JsonProcessingException e) {
-//            return new ResponseWrapper(false, e.getMessage());
-//        }
-//    }
-//
-//    public ResponseWrapper deleteItem(String data) {
-//        try {
-//            DeleteItemAmqpRequest request = objectMapper.readValue(data, DeleteItemAmqpRequest.class);
-//            Optional<User> userOptional = userDao.getUserById(request.getUserId());
-//            if (userOptional.isEmpty()) {
-//                return new ResponseWrapper(false, USER_NOT_FOUND.getMessage());
-//            }
-//
-//            String uuid = userOptional.get().getToken();
-//            String commandUuid = UUID.randomUUID().toString();
-//
-//            TodoistCommand todoistCommand = TodoistCommand.builder()
-//                    .type("item_delete")
-//                    .tempId(UUID.randomUUID().toString())
-//                    .uuid(commandUuid)
-//                    .arg("name", request.getItemId())
-//                    .build();
-//
-//            TodoistResponse todoistResponse = todoistClientService.postData(uuid, todoistCommand);
-//            itemDao.deleteItemById(request.getItemId());
-//            boolean isOk = isOkStatus(todoistResponse.getSyncStatus().get(commandUuid));
-//            return new ResponseWrapper(isOk, "");
-//        } catch (JsonProcessingException e) {
-//            return new ResponseWrapper(false, e.getMessage());
-//        }
-//    }
-//
-//    public ResponseWrapper deleteProject(String data) {
-//        try {
-//            DeleteProjectAmqpRequest request = objectMapper.readValue(data, DeleteProjectAmqpRequest.class);
-//            Optional<User> userOptional = userDao.getUserById(request.getUserId());
-//            if (userOptional.isEmpty()) {
-//                return new ResponseWrapper(false, USER_NOT_FOUND.getMessage());
-//            }
-//
-//            String uuid = userOptional.get().getToken();
-//            String commandUuid = UUID.randomUUID().toString();
-//
-//            TodoistCommand todoistCommand = TodoistCommand.builder()
-//                    .type("project_delete")
-//                    .tempId(UUID.randomUUID().toString())
-//                    .uuid(commandUuid)
-//                    .arg("name", request.getProjectId())
-//                    .build();
-//
-//            TodoistResponse todoistResponse = todoistClientService.postData(uuid, todoistCommand);
-//            projectDao.deleteProjectById(request.getProjectId());
-//            boolean isOk = isOkStatus(todoistResponse.getSyncStatus().get(commandUuid));
-//            return new ResponseWrapper(isOk, "");
-//        } catch (JsonProcessingException e) {
-//            return new ResponseWrapper(false, e.getMessage());
-//        }
-//    }
-//
-//    public ResponseWrapper getItem(String data) {
-//        try {
-//            GetItemAmqpRequest request = objectMapper.readValue(data, GetItemAmqpRequest.class);
-//            Optional<User> userOptional = userDao.getUserById(request.getUserId());
-//            if (userOptional.isEmpty()) {
-//                return new ResponseWrapper(false, USER_NOT_FOUND.getMessage());
-//            }
-//
-//            Optional<Item> itemResponse = itemDao.getItemById(request.getItemId());
-//            if (itemResponse.isEmpty()) {
-//                return new ResponseWrapper(false, ITEM_NOT_FOUND.getMessage());
-//            }
-//            GetItemAmqpResponse amqpResponse = itemToGetItemAmqpResponse(itemResponse.get());
-//
-//            return new ResponseWrapper(true, objectMapper.writeValueAsString(amqpResponse));
-//        } catch (JsonProcessingException e) {
-//            return new ResponseWrapper(false, e.getMessage());
-//        }
-//    }
-//
-//    public ResponseWrapper getItems(String data) {
-//        try {
-//            GetItemsAmqpRequest request = objectMapper.readValue(data, GetItemsAmqpRequest.class);
-//            Optional<User> userOptional = userDao.getUserById(request.getUserId());
-//            if (userOptional.isEmpty()) {
-//                return new ResponseWrapper(false, USER_NOT_FOUND.getMessage());
-//            }
-//            List<GetItemAmqpResponse> amqpResponses = getItemAmqpResponseListByProjectId(request.getProjectId());
-//            return new ResponseWrapper(true, objectMapper.writeValueAsString(amqpResponses));
-//        } catch (JsonProcessingException e) {
-//            return new ResponseWrapper(false, e.getMessage());
-//        }
-//    }
-//
-//    public ResponseWrapper getProject(String data) {
-//        try {
-//            GetProjectAmqpRequest request = objectMapper.readValue(data, GetProjectAmqpRequest.class);
-//            Optional<User> userOptional = userDao.getUserById(request.getUserId());
-//            if (userOptional.isEmpty()) {
-//                return new ResponseWrapper(false, USER_NOT_FOUND.getMessage());
-//            }
-//
-//            Optional<Project> projectOptional = projectDao.getProjectById(request.getProjectId());
-//            if (projectOptional.isEmpty()) {
-//                return new ResponseWrapper(false, PROJECT_NOT_FOUND.getMessage());
-//            }
-//            Project project = projectOptional.get();
-//
-//            GetProjectAmqpResponse amqpResponse = GetProjectAmqpResponse.builder()
-//                    .id(project.getId())
-//                    .name(project.getName())
-//                    .color(project.getColor())
-//                    .items(getItemAmqpResponseListByProjectId(request.getProjectId()))
-//                    .build();
-//            return new ResponseWrapper(true, objectMapper.writeValueAsString(amqpResponse));
-//        } catch (JsonProcessingException e) {
-//            return new ResponseWrapper(false, e.getMessage());
-//        }
-//    }
-//
-//    public ResponseWrapper getProjects(String data) {
-//        try {
-//            GetProjectsAmqpRequest request = objectMapper.readValue(data, GetProjectsAmqpRequest.class);
-//            Optional<User> userOptional = userDao.getUserById(request.getUserId());
-//            if (userOptional.isEmpty()) {
-//                return new ResponseWrapper(false, USER_NOT_FOUND.getMessage());
-//            }
-//            List<Project> projects = projectDao.getProjectsByUserId(request.getUserId());
-//            List<GetProjectAmqpResponse> amqpResponses = new LinkedList<>();
-//            for (Project project : projects) {
-//                GetProjectAmqpResponse amqpResponse = GetProjectAmqpResponse.builder()
-//                        .id(project.getId())
-//                        .name(project.getName())
-//                        .color(project.getColor())
-//                        .items(getItemAmqpResponseListByProjectId(project.getId()))
-//                        .build();
-//                amqpResponses.add(amqpResponse);
-//            }
-//            return new ResponseWrapper(true, objectMapper.writeValueAsString(amqpResponses));
-//        } catch (JsonProcessingException e) {
-//            return new ResponseWrapper(false, e.getMessage());
-//        }
-//    }
+    private TodoistCommand createDeleteProjectCommand(String commandUuid, long projectId) {
+        String COMMAND_TYPE_PROJECT_DELETE = "project_delete";
+        String COMMAND_ARG_PROJECT_ID = "id";
 
-//    private List<GetItemAmqpResponse> getItemAmqpResponseListByProjectId(long projectId) {
-//        List<Item> items = itemDao.getItemsByProjectId(projectId);
-//        List<GetItemAmqpResponse> amqpResponses = new LinkedList<>();
-//        items.forEach(p -> amqpResponses.add(itemToGetItemAmqpResponse(p)));
-//        return amqpResponses;
-//    }
+        return TodoistCommand.builder()
+                .type(COMMAND_TYPE_PROJECT_DELETE)
+                .uuid(commandUuid)
+                .arg(COMMAND_ARG_PROJECT_ID, projectId)
+                .build();
+    }
 
-//    private GetItemAmqpResponse itemToGetItemAmqpResponse(Item item) {
-//        return GetItemAmqpResponse.builder()
-//                .id(item.getId())
-//                .userId(item.getUserId())
-//                .projectId(item.getProjectId())
-//                .isCompleted(item.getDateCompleted() != null)
-//                .content(item.getContent())
-//                .build();
-//    }
+    private TodoistCommand createDeleteProjectCommand(String commandUuid, String tmpProjectId) {
+        String COMMAND_TYPE_PROJECT_DELETE = "project_delete";
+        String COMMAND_ARG_PROJECT_ID = "id";
 
-//    private void syncUsersData(User user) throws JsonProcessingException {
-//        List<TodoistResourcesTypes> resources = new LinkedList<>();
-//        resources.add(USER);
-//        resources.add(PROJECTS);
-//        resources.add(ITEMS);
-//        SyncResponse response = todoistClientService.getSyncData(user.getToken(), getSyncTokenByUserId(user.getId()), resources);
-//
-//        List<ItemDto> itemsDto = response.getItems();
-//        List<ProjectDto> projectsDto = response.getProjects();
-//        UserDto userDto = response.getUser();
-//
-//        userDao.insertUser(UserStructMapper.toUser(userDto));
-//        projectDao.insertProjects(ProjectStructMapper.toProjects(projectsDto, userDto.getId()));
-//        itemDao.insertItems(ItemStructMapper.toItems(itemsDto));
-//
-//        Sync sync = Sync.builder()
-//                .userId(userDto.getId())
-//                .syncToken(response.getToken())
-//                .build();
-//        syncDao.updateSync(sync);
-//    }
+        return TodoistCommand.builder()
+                .type(COMMAND_TYPE_PROJECT_DELETE)
+                .uuid(commandUuid)
+                .arg(COMMAND_ARG_PROJECT_ID, tmpProjectId)
+                .build();
+    }
 
 }
