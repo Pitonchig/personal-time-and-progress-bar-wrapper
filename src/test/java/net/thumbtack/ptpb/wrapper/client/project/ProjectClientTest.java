@@ -1,15 +1,6 @@
 package net.thumbtack.ptpb.wrapper.client.project;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import net.thumbtack.ptpb.wrapper.client.syncdata.TodoistClientService;
-import net.thumbtack.ptpb.wrapper.client.TodoistClientConfiguration;
-import net.thumbtack.ptpb.wrapper.client.TodoistClientProperties;
-import net.thumbtack.ptpb.wrapper.client.syncdata.TodoistResponse;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ContextConfiguration;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
