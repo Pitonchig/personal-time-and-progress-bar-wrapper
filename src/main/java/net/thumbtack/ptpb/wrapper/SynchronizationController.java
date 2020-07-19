@@ -3,18 +3,17 @@ package net.thumbtack.ptpb.wrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.thumbtack.ptpb.wrapper.common.ErrorCode;
 import net.thumbtack.ptpb.wrapper.common.PtpbException;
-import net.thumbtack.ptpb.wrapper.service.SynchronizationService;
-import net.thumbtack.ptpb.wrapper.service.synchronization.RabbitMqMessageProvider;
-import net.thumbtack.ptpb.wrapper.service.synchronization.ResponseWrapper;
-import net.thumbtack.ptpb.wrapper.service.synchronization.dto.ErrorAmqpDto;
-import net.thumbtack.ptpb.wrapper.service.synchronization.requests.*;
-import net.thumbtack.ptpb.wrapper.service.synchronization.responses.ErrorAmqpResponse;
-import net.thumbtack.ptpb.wrapper.service.synchronization.responses.SyncProjectsAmqpResponse;
-import net.thumbtack.ptpb.wrapper.service.synchronization.responses.SyncUserTokenAmqpResponse;
+import net.thumbtack.ptpb.wrapper.rabbitmq.services.SynchronizationService;
+import net.thumbtack.ptpb.wrapper.rabbitmq.RabbitMqMessageProvider;
+import net.thumbtack.ptpb.wrapper.rabbitmq.dto.ResponseWrapper;
+import net.thumbtack.ptpb.wrapper.rabbitmq.dto.ErrorAmqpDto;
+import net.thumbtack.ptpb.wrapper.rabbitmq.dto.requests.*;
+import net.thumbtack.ptpb.wrapper.rabbitmq.dto.responses.ErrorAmqpResponse;
+import net.thumbtack.ptpb.wrapper.rabbitmq.dto.responses.SyncProjectsAmqpResponse;
+import net.thumbtack.ptpb.wrapper.rabbitmq.dto.responses.SyncUserTokenAmqpResponse;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
