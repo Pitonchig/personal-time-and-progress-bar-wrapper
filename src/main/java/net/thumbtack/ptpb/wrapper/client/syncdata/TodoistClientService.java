@@ -2,14 +2,12 @@ package net.thumbtack.ptpb.wrapper.client.syncdata;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.thumbtack.ptpb.wrapper.client.TodoistClientProperties;
-import org.glassfish.jersey.client.ClientConfig;
-import org.glassfish.jersey.logging.LoggingFeature;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Form;
 import java.util.Collections;
@@ -17,7 +15,8 @@ import java.util.LinkedList;
 import java.util.List;
 
 @Slf4j
-@Component
+@Service
+@RequiredArgsConstructor
 public class TodoistClientService {
     private final ObjectMapper objectMapper;
     private final TodoistClientProperties properties;
@@ -28,15 +27,6 @@ public class TodoistClientService {
     private static final String COMMANDS = "commands";
 
     private final Client client;
-
-    public TodoistClientService(TodoistClientProperties properties, ObjectMapper objectMapper) {
-        this.properties = properties;
-        this.objectMapper = objectMapper;
-
-        ClientConfig clientConfig = new ClientConfig();
-        clientConfig.property(LoggingFeature.LOGGING_FEATURE_VERBOSITY_CLIENT, LoggingFeature.Verbosity.PAYLOAD_ANY);
-        client = ClientBuilder.newClient(clientConfig);
-    }
 
     public SyncResponse getSyncData(String token, String syncToken, List<TodoistResourcesTypes> resources) throws JsonProcessingException {
         List<String> resourcesStringList = new LinkedList<>();

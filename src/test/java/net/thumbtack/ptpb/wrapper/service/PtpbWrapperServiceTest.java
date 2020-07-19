@@ -1,7 +1,7 @@
 package net.thumbtack.ptpb.wrapper.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import net.thumbtack.ptpb.wrapper.SynchronizationService;
+import net.thumbtack.ptpb.wrapper.SynchronizationController;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -14,7 +14,7 @@ public class PtpbWrapperServiceTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Autowired
-    private SynchronizationService synchronizationService;
+    private SynchronizationController synchronizationController;
 
 
 //    @Test

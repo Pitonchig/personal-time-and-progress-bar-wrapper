@@ -17,8 +17,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
-import static net.thumbtack.ptpb.wrapper.service.synchronization.ErrorCode.HANDLER_NOT_REGISTERED;
-
+import static net.thumbtack.ptpb.wrapper.common.ErrorCode.HANDLER_NOT_REGISTERED;
 
 @Slf4j
 @Component
@@ -37,10 +36,12 @@ public class RabbitMqMessageProvider {
         }
 
         String requestJson = new String(message.getBody());
-        ResponseWrapper responseWrapper = handlers.get(type).apply(requestJson);
 
-//        if (!responseWrapper.isOk()) {
-//            return sendData(false, type, responseWrapper.getData());
+        //TODO: global exception handler
+//        try {
+            ResponseWrapper responseWrapper = handlers.get(type).apply(requestJson);
+//        } catch () {
+//
 //        }
 
         return sendData(responseWrapper.isOk(), type, objectMapper.writeValueAsString(responseWrapper));

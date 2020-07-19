@@ -7,9 +7,6 @@ import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.TimeZone;
-
-//@EnableRabbit
 @Configuration
 public class PtpbWrapperServiceConfiguration {
 
@@ -25,34 +22,9 @@ public class PtpbWrapperServiceConfiguration {
         return new Jackson2JsonMessageConverter();
     }
 
-
     @Bean
     public Queue queue() {
         return new Queue("ptpb-wrapper");
     }
-//
-//    @Bean
-//    public TopicExchange appExchange() {
-//        return new TopicExchange("ptpb-wrapper");
-//    }
-//
-//    @Bean
-//    public Queue appQueueGeneric() {
-//        return new Queue("ptpb-wrapper");
-//    }
-//
-//    @Bean
-//    public Queue appQueueSpecific() {
-//        return new Queue("ptpb-wrapper-specific");
-//    }
-//
-//    @Bean
-//    public Binding declareBindingGeneric() {
-//        return BindingBuilder.bind(appQueueGeneric()).to(appExchange()).with("ptpb");
-//    }
 
-//    @Bean
-//    public Binding declareBindingSpecific() {
-//        return BindingBuilder.bind(appQueueSpecific()).to(appExchange()).with("ptpb-specific");
-//    }
 }
