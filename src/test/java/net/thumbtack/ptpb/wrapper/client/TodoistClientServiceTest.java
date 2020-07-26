@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest
 public class TodoistClientServiceTest {
-    private String token = "5f6e430cf393ae5db86773b5e79989fbef6a28d9";
+    private final String token = "5f6e430cf393ae5db86773b5e79989fbef6a28d9";
 
     @Autowired
     private TodoistClientService todoistClient;

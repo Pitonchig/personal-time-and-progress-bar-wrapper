@@ -36,8 +36,4 @@ public class ResourceDao {
         resourceMapper.findByTodoistId(id).forEach(resources::add);
         return resources;
     }
-
-    public void deleteResourceById(String id) {
-        resourceMapper.deleteById(id);
-    }
 }

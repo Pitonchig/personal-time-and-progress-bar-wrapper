@@ -12,7 +12,6 @@ import java.util.Collections;
 @Configuration
 @RequiredArgsConstructor
 @EnableAerospikeRepositories
-//@EnableAerospikeRepositories(basePackages = {"net.thumbtack.ptpb.wrapper.db"})
 public class DbConfiguration extends AbstractAerospikeDataConfiguration {
 
     private final DbProperties dbProperties;

@@ -34,8 +34,8 @@ public class SynchronizationController {
         synchronizationService = service;
         rabbitMqMessageProvider = provider;
 
-        provider.registerHandler(SyncUserTokenAmqpRequest.class.getSimpleName(), this::syncUserToken);
-        provider.registerHandler(SyncProjectsAmqpRequest.class.getSimpleName(), this::syncProjects);
+        rabbitMqMessageProvider.registerHandler(SyncUserTokenAmqpRequest.class.getSimpleName(), this::syncUserToken);
+        rabbitMqMessageProvider.registerHandler(SyncProjectsAmqpRequest.class.getSimpleName(), this::syncProjects);
     }
 
     public ResponseWrapper syncUserToken(String data) {
@@ -104,7 +104,4 @@ public class SynchronizationController {
                 .data(json)
                 .build();
     }
-////////////////////////////////////////
-
-
 }

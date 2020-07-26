@@ -37,14 +37,7 @@ public class RabbitMqMessageProvider {
         }
 
         String requestJson = new String(message.getBody());
-
-        //TODO: global exception handler
-//        try {
-            ResponseWrapper responseWrapper = handlers.get(type).apply(requestJson);
-//        } catch () {
-//
-//        }
-
+        ResponseWrapper responseWrapper = handlers.get(type).apply(requestJson);
         return sendData(responseWrapper.isOk(), type, objectMapper.writeValueAsString(responseWrapper));
     }
 
